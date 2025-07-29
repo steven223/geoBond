@@ -1,24 +1,37 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useContext } from "react";
 import { View, Text, StyleSheet, Animated } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { AuthContext } from "../context/AuthContext";
 
 export default function WelcomeScreen() {
-  const [userName, setUserName] = useState("");
+  const [fullName, setUserName] = useState("");
   const navigation = useNavigation();
-  const scaleAnim = useRef(new Animated.Value(0)).current; // useRef to persist animation value
+  const { user, setHasSeenWelcome } = useContext(AuthContext);
+  const scaleAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const userString = await AsyncStorage.getItem("user");
-        if (userString) {
-          const user = JSON.parse(userString);
+        if (user) {
           console.log("👤 User data:", user.email);
-          setUserName(user.email);
+          setUserName(user.fullName);
+        } else {
+          // If no user data, redirect to login
+          navigation.reset({
+            index: 0,
+            routes: [{ name: "Login" as never }],
+          });
+          return;
         }
       } catch (error) {
         console.error("❌ Error fetching user from storage:", error);
+        // If error, redirect to login
+        navigation.reset({
+          index: 0,
+          routes: [{ name: "Login" as never }],
+        });
+        return;
       }
     };
 
@@ -31,13 +44,13 @@ export default function WelcomeScreen() {
     }).start();
 
     // Navigate after animation + delay
-    const timer = setTimeout(() => {
-      // Check if user exists, else redirect to Login
-      if (userName) {
-        navigation.reset({
-          index: 0,
-          routes: [{ name: "HomeTabs" as never }],
-        });
+    const timer = setTimeout(async () => {
+      if (user) {
+        // Mark that user has seen welcome screen
+        await setHasSeenWelcome(true);
+        
+        // Don't navigate here - let AuthContext handle the navigation flow
+        // The AuthContext will automatically show the appropriate screen based on user state
       } else {
         navigation.reset({
           index: 0,
@@ -48,42 +61,17 @@ export default function WelcomeScreen() {
 
     // Cleanup timer on unmount
     return () => clearTimeout(timer);
-  }, [navigation, scaleAnim, userName]);
+  }, [navigation, scaleAnim, user, setHasSeenWelcome]);
 
-  // This causes the effect to fire each time userName changes,
-  // which means navigation.reset might happen sooner than expected.
-  // To avoid that, move navigation logic to a separate effect.
-
-  // Revised: Better to separate fetching user and navigation timing:
-
-  /*
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const userString = await AsyncStorage.getItem("user");
-        if (userString) {
-          const user = JSON.parse(userString);
-          setUserName(user.email);
-        }
-      } catch (error) {}
-    };
-    fetchUser();
-    Animated.spring(scaleAnim, {...}).start();
-  }, []);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (userName) navigation.reset({routes: [{name: "HomeTabs"}], index: 0});
-      else navigation.reset({routes: [{name: "Login"}], index: 0});
-    }, 2500);
-    return () => clearTimeout(timer);
-  }, [userName]);
-  */
+  // If no user, don't render anything (will redirect to login)
+  if (!user) {
+    return null;
+  }
 
   return (
     <View style={styles.container}>
       <Animated.View style={[styles.card, { transform: [{ scale: scaleAnim }] }]}>
-        <Text style={styles.text}>Welcome{userName ? `, ${userName}` : ""}!</Text>
+        <Text style={styles.text}>Welcome{fullName ? `, ${fullName}` : ""}!</Text>
       </Animated.View>
     </View>
   );

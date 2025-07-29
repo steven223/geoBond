@@ -1,15 +1,18 @@
 // src/screens/HomeScreen.tsx
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useContext } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   FlatList,
+  Alert,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { AuthContext } from '../context/AuthContext';
+import Toast from 'react-native-toast-message';
 
 const features = [
   { id: '1', title: 'Live Map', icon: 'map', screen: 'MapScreen' },
@@ -20,6 +23,7 @@ const features = [
 
 const HomeScreen = () => {
   const navigation = useNavigation();
+  const { logout, user } = useContext(AuthContext);
   const [username, setUsername] = useState<string>('User');
   const [darkMode, setDarkMode] = useState(false);
 
@@ -35,6 +39,45 @@ const HomeScreen = () => {
     fetchUsername();
   }, []);
 
+  const handleLogout = () => {
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to logout? This will stop sharing your location.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Logout',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // Clear all AsyncStorage data
+              await AsyncStorage.clear();
+              
+              // Call logout from AuthContext
+              await logout();
+              
+              Toast.show({
+                type: 'success',
+                text1: 'Logged Out',
+                text2: 'You have been successfully logged out.',
+              });
+            } catch (error) {
+              console.error('Error during logout:', error);
+              Toast.show({
+                type: 'error',
+                text1: 'Logout Error',
+                text2: 'Failed to logout. Please try again.',
+              });
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const toggleTheme = () => {
     setDarkMode(!darkMode);
   };
@@ -43,18 +86,27 @@ const HomeScreen = () => {
 
   return (
     <View style={[styles.container, themeStyles.container]}>
-      {/* Header with toggle */}
+      {/* Header with logout button */}
       <View style={styles.headerRow}>
         <Text style={[styles.header, themeStyles.text]}>
-          Welcome back, {username} 👋
+          Welcome back, {user?.fullName || username} 👋
         </Text>
-        <TouchableOpacity onPress={toggleTheme}>
-          <Ionicons
-            name={darkMode ? 'sunny' : 'moon'}
-            size={28}
-            color={darkMode ? '#facc15' : '#1e293b'}
-          />
-        </TouchableOpacity>
+        <View style={styles.headerButtons}>
+          <TouchableOpacity onPress={toggleTheme} style={styles.headerButton}>
+            <Ionicons
+              name={darkMode ? 'sunny' : 'moon'}
+              size={24}
+              color={darkMode ? '#facc15' : '#1e293b'}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleLogout} style={styles.headerButton}>
+            <Ionicons
+              name="log-out-outline"
+              size={24}
+              color="#ef4444"
+            />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Feature Grid */}
@@ -100,6 +152,15 @@ const styles = StyleSheet.create({
   header: {
     fontSize: 22,
     fontWeight: 'bold',
+    flex: 1,
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerButton: {
+    padding: 8,
+    marginLeft: 8,
   },
   grid: {
     paddingBottom: 20,
@@ -127,30 +188,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
   },
-
-  // Themes
-  // light: {
-  //   container: {
-  //     backgroundColor: '#F9FAFB',
-  //   },
-  //   text: {
-  //     color: '#1E293B',
-  //   },
-  //   card: {
-  //     backgroundColor: '#ffffff',
-  //   },
-  // },
-  // dark: {
-  //   container: {
-  //     backgroundColor: '#0f172a',
-  //   },
-  //   text: {
-  //     color: '#F1F5F9',
-  //   },
-  //   card: {
-  //     backgroundColor: '#1e293b',
-  //   },
-  // },
 });
 
 const themes = {

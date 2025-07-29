@@ -11,30 +11,51 @@ import {
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import Toast from 'react-native-toast-message';
+import { Ionicons } from "@expo/vector-icons";
 import { registerUser } from "../services/authService";
 
 const RegisterScreen = () => {
   const navigation = useNavigation<any>();
-  const [name, setName] = useState("");
+  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleRegister = async () => {
-    if (!name || !email || !password) {
-      return alert("All fields are required.");
+    if (!fullName || !email || !password) {
+      Toast.show({
+        type: 'error',
+        text1: 'Validation Error',
+        text2: 'All fields are required.',
+      });
+      return;
     }
+    
     try {
       setLoading(true);
-      const response = await registerUser(email, password, name);
-      if (response.token) {
-        alert("Registration successful!");
+      const response = await registerUser(email, password, fullName);
+      if (response.message === "User registered") {
+        Toast.show({
+          type: 'success',
+          text1: 'Registration Successful!',
+          text2: 'Your account has been created successfully.',
+        });
         navigation.navigate("Login");
       } else {
-        alert(response.message || "Something went wrong");
+        Toast.show({
+          type: 'error',
+          text1: 'Registration Failed',
+          text2: response.message || 'Something went wrong',
+        });
       }
     } catch (err) {
-      alert("Error occurred during registration.");
+      Toast.show({
+        type: 'error',
+        text1: 'Network Error',
+        text2: 'Error occurred during registration.',
+      });
     } finally {
       setLoading(false);
     }
@@ -53,8 +74,8 @@ const RegisterScreen = () => {
           style={styles.input}
           placeholder="Name"
           placeholderTextColor="#aaa"
-          value={name}
-          onChangeText={setName}
+          value={fullName}
+          onChangeText={setFullName}
         />
 
         <TextInput
@@ -67,14 +88,26 @@ const RegisterScreen = () => {
           onChangeText={setEmail}
         />
 
-        <TextInput
-          style={styles.input}
-          placeholder="Password"
-          placeholderTextColor="#aaa"
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-        />
+        <View style={styles.passwordContainer}>
+          <TextInput
+            style={styles.passwordInput}
+            placeholder="Password"
+            placeholderTextColor="#aaa"
+            secureTextEntry={!showPassword}
+            value={password}
+            onChangeText={setPassword}
+          />
+          <TouchableOpacity
+            style={styles.eyeButton}
+            onPress={() => setShowPassword(!showPassword)}
+          >
+            <Ionicons
+              name={showPassword ? "eye-off" : "eye"}
+              size={20}
+              color="#666"
+            />
+          </TouchableOpacity>
+        </View>
 
         <TouchableOpacity style={styles.button} onPress={handleRegister} disabled={loading}>
           {loading ? (
@@ -126,6 +159,26 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderWidth: 1,
     borderColor: "#e5e7eb",
+  },
+  passwordContainer: {
+    position: 'relative',
+    marginBottom: 16,
+  },
+  passwordInput: {
+    backgroundColor: "#fff",
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    paddingRight: 50, // Space for eye button
+    borderRadius: 12,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+  },
+  eyeButton: {
+    position: 'absolute',
+    right: 16,
+    top: 14,
+    padding: 4,
   },
   button: {
     backgroundColor: "#1e3c72",

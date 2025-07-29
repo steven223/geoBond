@@ -8,46 +8,51 @@ import {
   Image,
   StatusBar,
 } from 'react-native';
-import { useNavigation } from "@react-navigation/native";
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { Friend, FriendsResponse, friendShipService } from '../services/friendshipService';
+import { useRoute } from '@react-navigation/native';
+import { Friend, FriendsResponse, LocationHistory, LocationHistoryResponse, friendShipService } from '../../services/friendshipService';
 
 
-const FriendsScreen = () => {
-  const navigation = useNavigation<any>();
-  const [friends, setFriends] = useState<FriendsResponse>({
+const FriendLocation = ({ route }: { route: any }) => {
+  const [history, setHistory] = useState<LocationHistoryResponse>({
     data: [],
     status: '',
   });
+  const { friendId } = route.params;
+  let dateFormat = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = date.toLocaleString('en-US', { month: 'short' }); // e.g., Jan, Feb
+    const year = date.getFullYear();
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+
+    return `${day} ${month} ${year} ${hours}:${minutes}`;
+  }
+  const friendHistory = async () => {
+    const response = await friendShipService.getFriendLocationHistory(friendId);
+    console.log("Frineds History", response);
+    setHistory(response);
+  };
 
   useEffect(() => {
-    const fetchFriendsList = async () => {
-      try {
-        const response = await friendShipService.getFriends(); // 🔁 Fetch from backend
-        setFriends(response);
-      } catch (error) {
-        console.error("❌ Failed to fetch friends:", error);
-      }
-    };
-
-    fetchFriendsList(); // 🚀 Call once on mount
+    friendHistory();
   }, []);
 
-  //set item as array
-  const renderFriendItem = ({ item }: { item: Friend }) => (
+  const renderFriendItem = ({ item }: { item: LocationHistory }) => (
     console.log("item", item),
     <TouchableOpacity
       style={styles.card}
       activeOpacity={0.7}
       onPress={() => {
-        navigation.navigate('FriendLocation', { friendId: item._id });
+        // navigation.navigate('FriendLocation', { friendId: item._id });
       }}
     >
       <View style={styles.avatarWrapper}>
         <Image
           source={{
-            uri: item?.gender === 'male' ? 'https://via.placeholder.com/56' : 'https://via.placeholder.com/56', // fallback image
+            uri: item?.allUserAddress[0]?.text || 'https://via.placeholder.com/56',
           }}
           style={styles.avatar}
         />
@@ -55,11 +60,11 @@ const FriendsScreen = () => {
       </View>
 
       <View style={styles.info}>
-        <Text style={styles.name}>{item.fullName}</Text>
+        <Text style={styles.name}>{item?.allUserAddress[0]?.text}</Text>
         <View style={styles.locationRow}>
           <Ionicons name="location-outline" size={16} color="#777" />
           <Text style={styles.locationText}>
-            {item?.location?.city || 'Unknown'}
+            {dateFormat(item?.timestamp)}
           </Text>
         </View>
       </View>
@@ -77,24 +82,24 @@ const FriendsScreen = () => {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor="#f0f4f8" />
       <View style={styles.header}>
-        <Text style={styles.title}>Friends</Text>
+        <Text style={styles.title}>Location</Text>
         <TouchableOpacity onPress={() => {/* add friend navigation */ }}>
           <Ionicons name="person-add" size={28} color="#1e3c72" />
         </TouchableOpacity>
       </View>
 
       <FlatList
-        data={friends.data}
+        data={history.data}
         keyExtractor={item => item._id}
         renderItem={renderFriendItem}
         contentContainerStyle={{ paddingBottom: 32 }}
         showsVerticalScrollIndicator={false}
       />
     </SafeAreaView>
-  );
-};
+  )
+}
 
-export default FriendsScreen;
+export default FriendLocation
 
 const styles = StyleSheet.create({
   safeArea: {

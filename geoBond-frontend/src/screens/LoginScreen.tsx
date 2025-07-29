@@ -11,6 +11,9 @@ import {
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import * as Location from 'expo-location';
+import Toast from 'react-native-toast-message';
+import { Ionicons } from "@expo/vector-icons";
 import { loginUser } from "../services/authService";
 import { AuthContext } from "../context/AuthContext";
 
@@ -21,30 +24,73 @@ const LoginScreen = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
+  const requestLocationPermission = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Toast.show({
+          type: 'error',
+          text1: 'Location Permission Required',
+          text2: 'Please enable location access to use all features of the app.',
+        });
+        return false;
+      }
+      return true;
+    } catch (error) {
+      Toast.show({
+        type: 'error',
+        text1: 'Permission Error',
+        text2: 'Failed to request location permission.',
+      });
+      return false;
+    }
+  };
 
   const handleLogin = async () => {
-    if (!email || !password) return alert("Please fill all fields");
+    if (!email || !password) {
+      Toast.show({
+        type: 'error',
+        text1: 'Validation Error',
+        text2: 'Please fill all fields',
+      });
+      return;
+    }
 
     try {
       setLoading(true);
       const response = await loginUser(email, password);
       console.log("Response:", response);
+      
       if (response.token) {
-        // Save token and user in context (also AsyncStorage internally)
-        await login(response.user);
+        // Pass both user and token to login function
+        await login(response.user, response.token);
 
-        alert("Welcome " + response.user.email);
-
-        // Navigate to main app stack (HomeTabs)
-        navigation.reset({
-          index: 0,
-          routes: [{ name: "HomeTabs" }],
+        Toast.show({
+          type: 'success',
+          text1: 'Welcome!',
+          text2: `Welcome ${response.user.email}`,
         });
+
+        // Request location permission after successful login
+        await requestLocationPermission();
+
+        // Don't navigate here - let AuthContext handle the navigation flow
+        // The AuthContext will automatically show the appropriate screen based on user state
       } else {
-        alert(response.message || "Login failed");
+        Toast.show({
+          type: 'error',
+          text1: 'Login Failed',
+          text2: response.message || 'Invalid credentials',
+        });
       }
     } catch (err) {
-      alert("Something went wrong");
+      Toast.show({
+        type: 'error',
+        text1: 'Network Error',
+        text2: 'Something went wrong. Please try again.',
+      });
     } finally {
       setLoading(false);
     }
@@ -69,14 +115,26 @@ const LoginScreen = () => {
           onChangeText={setEmail}
         />
 
-        <TextInput
-          style={styles.input}
-          placeholder="Password"
-          placeholderTextColor="#aaa"
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-        />
+        <View style={styles.passwordContainer}>
+          <TextInput
+            style={styles.passwordInput}
+            placeholder="Password"
+            placeholderTextColor="#aaa"
+            secureTextEntry={!showPassword}
+            value={password}
+            onChangeText={setPassword}
+          />
+          <TouchableOpacity
+            style={styles.eyeButton}
+            onPress={() => setShowPassword(!showPassword)}
+          >
+            <Ionicons
+              name={showPassword ? "eye-off" : "eye"}
+              size={20}
+              color="#666"
+            />
+          </TouchableOpacity>
+        </View>
 
         <TouchableOpacity
           style={styles.button}
@@ -133,6 +191,26 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderWidth: 1,
     borderColor: "#e5e7eb",
+  },
+  passwordContainer: {
+    position: 'relative',
+    marginBottom: 16,
+  },
+  passwordInput: {
+    backgroundColor: "#fff",
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    paddingRight: 50, // Space for eye button
+    borderRadius: 12,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+  },
+  eyeButton: {
+    position: 'absolute',
+    right: 16,
+    top: 14,
+    padding: 4,
   },
   button: {
     backgroundColor: "#1e3c72",
