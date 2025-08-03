@@ -36,7 +36,9 @@
     "react-native-web": "^0.20.0",
     "socket.io-client": "^4.8.1",
     "watchman": "^1.0.0",
-    "zod": "^4.0.5"
+    "zod": "^4.0.5",
+    "expo-blur": "~14.1.5",
+    "lottie-react-native": "7.2.2"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

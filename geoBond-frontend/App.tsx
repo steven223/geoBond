@@ -10,7 +10,7 @@ import LoginScreen from "./src/screens/LoginScreen";
 import RegisterScreen from "./src/screens/RegisterScreen";
 import HomeScreen from "./src/screens/HomeScreen";
 import FriendsScreen from "./src/screens/FriendsScreen";
-import ProfileScreen from "./src/screens/ProfileScreen";
+import ProfileScreen from "./src/screens/Profile/ProfileScreen";
 import MapScreen from "./src/screens/MapScreen";
 import FavouritesScreen from "./src/screens/FavouritesScreen";
 
@@ -33,6 +33,7 @@ function MainTabs() {
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="home" size={size} color={color} />
           ),
+          headerShown: false,
         }}
         name="Home"
         component={HomeScreen}
@@ -42,6 +43,7 @@ function MainTabs() {
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="people" size={size} color={color} />
           ),
+          headerShown: false,
         }}
         name="Friends"
         component={FriendsScreen}
@@ -51,6 +53,7 @@ function MainTabs() {
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person" size={size} color={color} />
           ),
+          headerShown: false,
         }}
         name="Profile"
         component={ProfileScreen}
@@ -83,7 +86,7 @@ function AppStack() {
         gestureEnabled: false // Disable swipe back gesture
       }}
     >
-      <Stack.Screen name="HomeTabs" component={MainTabs} />
+      <Stack.Screen name="HomeTabs" component={MainTabs} options={{headerShown: false}}  />
       <Stack.Screen name="MapScreen" component={MapScreen} />
       <Stack.Screen name="FavouritesScreen" component={FavouritesScreen} />
       <Stack.Screen name="FriendsScreen" component={FriendsScreen} />

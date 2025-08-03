@@ -41,10 +41,10 @@ class LocationService {
       console.log('📍 Real-time location tracking started');
 
       // Also send initial location immediately
-      // const currentLocation = await Location.getCurrentPositionAsync({
-      //   accuracy: Location.Accuracy.High,
-      // });
-      // await this.sendLocationViaSocket(currentLocation);
+      const currentLocation = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+      await this.sendLocationViaSocket(currentLocation);
 
       return true;
     } catch (error) {
