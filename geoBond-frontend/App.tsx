@@ -18,6 +18,10 @@ import { ThemeProvider } from "./src/context/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
 import { AuthProvider, AuthContext } from "./src/context/AuthContext";
 import FriendLocation from "./src/screens/FriendLocationHistory/FriendLocation";
+import UserSearchScreen from "./src/screens/UserSearchScreen";
+import UserProfileScreen from "./src/screens/UserProfileScreen";
+import FriendRequestsScreen from "./src/screens/FriendRequestsScreen";
+import EditProfileScreen from "./src/screens/EditProfileScreen";
 
 // Import your custom icon
 
@@ -90,6 +94,10 @@ function AppStack() {
       <Stack.Screen name="MapScreen" component={MapScreen} />
       <Stack.Screen name="FavouritesScreen" component={FavouritesScreen} />
       <Stack.Screen name="FriendsScreen" component={FriendsScreen} />
+      <Stack.Screen name="UserSearch" component={UserSearchScreen} />
+      <Stack.Screen name="UserProfile" component={UserProfileScreen} />
+      <Stack.Screen name="FriendRequests" component={FriendRequestsScreen} />
+      <Stack.Screen name="EditProfile" component={EditProfileScreen} />
       {/* How to pass friendId to FriendLocation */}
       <Stack.Screen name="FriendLocation" component={FriendLocation} />
     </Stack.Navigator>

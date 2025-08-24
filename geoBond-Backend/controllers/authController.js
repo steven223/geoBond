@@ -35,14 +35,147 @@ exports.login = async (req, res) => {
 };
 
 exports.getProfile = async (req, res) => {
-  const user = await User.findById(req.user._id).select("-passwordHash");
-  res.json(user);
+  try {
+    const user = await User.findById(req.user._id).select("-passwordHash");
+    
+    if (!user) {
+      return res.status(404).json({ 
+        status: "error",
+        message: "User not found" 
+      });
+    }
+
+    res.json({
+      status: "success",
+      data: user
+    });
+  } catch (err) {
+    console.error("Get profile error:", err);
+    res.status(500).json({ 
+      status: "error",
+      message: "Server error while fetching profile" 
+    });
+  }
 };
 
 exports.updateProfile = async (req, res) => {
-  const updateData = req.body;
-  const user = await User.findByIdAndUpdate(req.user._id, updateData, { new: true });
-  res.json({ message: "Profile updated", user });
+  try {
+    const { 
+      fullName, 
+      phone, 
+      bio, 
+      dob, 
+      gender, 
+      location,
+      profileImageUrl 
+    } = req.body;
+
+    // Validate input data
+    const updateData = {};
+    
+    if (fullName !== undefined) {
+      if (!fullName || fullName.trim().length < 2) {
+        return res.status(400).json({ 
+          status: "error",
+          message: "Full name must be at least 2 characters long" 
+        });
+      }
+      updateData.fullName = fullName.trim();
+    }
+
+    if (phone !== undefined) {
+      if (phone && !/^\+?[\d\s\-\(\)]{10,}$/.test(phone)) {
+        return res.status(400).json({ 
+          status: "error",
+          message: "Please enter a valid phone number" 
+        });
+      }
+      updateData.phone = phone;
+    }
+
+    if (bio !== undefined) {
+      if (bio && bio.length > 500) {
+        return res.status(400).json({ 
+          status: "error",
+          message: "Bio must be less than 500 characters" 
+        });
+      }
+      updateData.bio = bio;
+    }
+
+    if (dob !== undefined) {
+      if (dob) {
+        const birthDate = new Date(dob);
+        const today = new Date();
+        const age = today.getFullYear() - birthDate.getFullYear();
+        
+        if (isNaN(birthDate.getTime()) || age < 13 || age > 120) {
+          return res.status(400).json({ 
+            status: "error",
+            message: "Please enter a valid date of birth (age must be between 13-120)" 
+          });
+        }
+        updateData.dob = birthDate;
+      } else {
+        updateData.dob = null;
+      }
+    }
+
+    if (gender !== undefined) {
+      if (gender && !['male', 'female', 'other'].includes(gender)) {
+        return res.status(400).json({ 
+          status: "error",
+          message: "Gender must be male, female, or other" 
+        });
+      }
+      updateData.gender = gender;
+    }
+
+    if (location !== undefined) {
+      if (location && typeof location === 'object') {
+        updateData.location = {
+          city: location.city || '',
+          state: location.state || '',
+          country: location.country || ''
+        };
+      } else {
+        updateData.location = null;
+      }
+    }
+
+    if (profileImageUrl !== undefined) {
+      updateData.profileImageUrl = profileImageUrl;
+    }
+
+    // Update user profile
+    const user = await User.findByIdAndUpdate(
+      req.user._id, 
+      updateData, 
+      { 
+        new: true,
+        runValidators: true 
+      }
+    ).select("-passwordHash");
+
+    if (!user) {
+      return res.status(404).json({ 
+        status: "error",
+        message: "User not found" 
+      });
+    }
+
+    res.json({ 
+      status: "success",
+      message: "Profile updated successfully", 
+      data: user 
+    });
+  } catch (err) {
+    console.error("Update profile error:", err);
+    res.status(500).json({ 
+      status: "error",
+      message: "Server error while updating profile" 
+    });
+  }
 };
 
 exports.updateLocation = async (req, res) => {
@@ -67,5 +200,30 @@ exports.getAllUsers = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error" });
+  }
+};
+
+exports.getUserById = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const user = await User.findById(userId).select("-passwordHash");
+    
+    if (!user) {
+      return res.status(404).json({ 
+        status: "error",
+        message: "User not found" 
+      });
+    }
+
+    res.json({
+      status: "success",
+      data: user
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ 
+      status: "error",
+      message: "Server error" 
+    });
   }
 };

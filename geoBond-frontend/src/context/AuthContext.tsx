@@ -76,15 +76,33 @@ export const AuthProvider = ({ children }: Props) => {
     }
 
     const logout = async () => {
-        // Stop location tracking before logout
-        await locationService.stopLocationTracking();
-        
-        setUser(null);
-        setToken(null);
-        await AsyncStorage.removeItem('user');
-        await AsyncStorage.removeItem('token');
-        await AsyncStorage.removeItem('hasSeenWelcome');
-        setHasSeenWelcomeState(false);
+        try {
+            // Stop location tracking before logout
+            await locationService.stopLocationTracking();
+            
+            // Disconnect socket if connected
+            const socket = getSocket();
+            if (socket && socket.connected) {
+                socket.disconnect();
+                console.log('🧹 Socket disconnected during logout');
+            }
+            
+            // Clear user data
+            setUser(null);
+            setToken(null);
+            
+            // Clear AsyncStorage
+            await AsyncStorage.multiRemove(['user', 'token', 'hasSeenWelcome']);
+            setHasSeenWelcomeState(false);
+            
+            console.log('✅ Logout completed successfully');
+        } catch (error) {
+            console.error('❌ Error during logout:', error);
+            // Still clear user data even if there's an error
+            setUser(null);
+            setToken(null);
+            setHasSeenWelcomeState(false);
+        }
     };
 
     useEffect(() => {

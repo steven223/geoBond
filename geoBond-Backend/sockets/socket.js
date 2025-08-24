@@ -18,7 +18,7 @@ function setupSocket(io) {
         // https://us1.locationiq.com/v1/reverse?key=Your_API_Access_Token&lat=51.50344025&lon=-0.12770820958562096&format=json&
         // const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`;
         // https://api.mapbox.com/geocoding/v5/mapbox.places/{lng},{lat}.json?access_token=YOUR_MAPBOX_ACCESS_TOKEN
-        // const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${process.env.MAPBOX_ACCESS_TOKEN}`;
+        // const url = `${process.env.MAPBOX_URL}access_token=${process.env.MAPBOX_ACCESS_TOKEN}`;
         // const response = await fetch(url, {
         //   headers: { 'User-Agent': 'geoBond/1.0 (mehtashiv223@gmail.com)' }
         // });

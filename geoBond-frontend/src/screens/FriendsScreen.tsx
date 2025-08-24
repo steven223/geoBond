@@ -1,17 +1,25 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  Image,
   StatusBar,
+  RefreshControl,
 } from 'react-native';
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
+import Toast from 'react-native-toast-message';
 import { Friend, FriendsResponse, friendShipService } from '../services/friendshipService';
+import { COLORS, SPACING, TYPOGRAPHY, SHADOWS } from '../constants/theme';
+import LoadingState from '../components/LoadingState';
+import EmptyState from '../components/EmptyState';
+import GradientBackground from '../components/GradientBackground';
+import SectionHeader from '../components/SectionHeader';
+import FriendCard from '../components/FriendCard';
+import SearchBar from '../components/SearchBar';
 
 
 const FriendsScreen = () => {
@@ -20,157 +28,252 @@ const FriendsScreen = () => {
     data: [],
     status: '',
   });
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filteredFriends, setFilteredFriends] = useState<Friend[]>([]);
+  const [requestCount, setRequestCount] = useState(0);
 
-  useEffect(() => {
-    const fetchFriendsList = async () => {
-      try {
-        const response = await friendShipService.getFriends(); // 🔁 Fetch from backend
-        setFriends(response);
-      } catch (error) {
-        console.error("❌ Failed to fetch friends:", error);
-      }
-    };
-
-    fetchFriendsList(); // 🚀 Call once on mount
-  }, []);
-
-  //set item as array
-  const renderFriendItem = ({ item }: { item: Friend }) => (
-    console.log("item", item),
-    <TouchableOpacity
-      style={styles.card}
-      activeOpacity={0.7}
-      onPress={() => {
-        navigation.navigate('FriendLocation', { friendId: item._id });
-      }}
-    >
-      <View style={styles.avatarWrapper}>
-        <Image
-          source={{
-            uri: item?.gender === 'male' ? 'https://via.placeholder.com/56' : 'https://via.placeholder.com/56', // fallback image
-          }}
-          style={styles.avatar}
-        />
-        {/* For now, online status is hardcoded or can be fetched later */}
-      </View>
-
-      <View style={styles.info}>
-        <Text style={styles.name}>{item.fullName}</Text>
-        <View style={styles.locationRow}>
-          <Ionicons name="location-outline" size={16} color="#777" />
-          <Text style={styles.locationText}>
-            {item?.location?.city || 'Unknown'}
-          </Text>
-        </View>
-      </View>
-
-      <MaterialIcons
-        name="keyboard-arrow-right"
-        size={24}
-        color="#ccc"
-        style={{ alignSelf: 'center' }}
-      />
-    </TouchableOpacity>
+  // Load friends when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      fetchFriendsList();
+    }, [])
   );
 
+  const fetchFriendsList = async (isRefresh = false) => {
+    try {
+      if (isRefresh) {
+        setIsRefreshing(true);
+      } else {
+        setIsLoading(true);
+      }
+      
+      const [friendsResponse, countsResponse] = await Promise.all([
+        friendShipService.getFriends(),
+        friendShipService.getRequestCounts(),
+      ]);
+      
+      setFriends(friendsResponse);
+      setFilteredFriends(friendsResponse.data);
+      setRequestCount(countsResponse.incoming);
+    } catch (error: any) {
+      console.error("❌ Failed to fetch friends:", error);
+      Toast.show({
+        type: 'error',
+        text1: 'Load Failed',
+        text2: error.message || 'Failed to load friends list',
+      });
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  };
+
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+    if (query.trim() === '') {
+      setFilteredFriends(friends.data);
+    } else {
+      const filtered = friends.data.filter(friend =>
+        friend.fullName.toLowerCase().includes(query.toLowerCase()) ||
+        friend.email.toLowerCase().includes(query.toLowerCase())
+      );
+      setFilteredFriends(filtered);
+    }
+  };
+
+  const handleRefresh = () => {
+    fetchFriendsList(true);
+  };
+
+  const renderFriendItem = ({ item }: { item: Friend }) => (
+    <FriendCard
+      name={item.fullName}
+      status={Math.random() > 0.5 ? 'online' : 'offline'} // Mock status
+      location={item?.location?.city || 'Location not set'}
+      lastSeen={Math.random() > 0.5 ? '2 hours ago' : undefined}
+      onPress={() => navigation.navigate('UserProfile', { userId: item._id })}
+      onLocationPress={() => navigation.navigate('FriendLocation', { friendId: item._id })}
+      onMessagePress={() => {
+        Toast.show({
+          type: 'info',
+          text1: 'Coming Soon',
+          text2: 'Messaging feature will be available soon!',
+        });
+      }}
+    />
+  );
+
+  if (isLoading) {
+    return <LoadingState message="Loading friends..." />;
+  }
+
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#f0f4f8" />
-      <View style={styles.header}>
-        <Text style={styles.title}>Friends</Text>
-        <TouchableOpacity onPress={() => {/* add friend navigation */ }}>
-          <Ionicons name="person-add" size={28} color="#1e3c72" />
-        </TouchableOpacity>
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
+      
+      {/* Header with gradient */}
+      <GradientBackground gradient="primary" style={styles.header}>
+        <SafeAreaView>
+          <View style={styles.headerContent}>
+            <View style={styles.headerTop}>
+              <Text style={styles.title}>My Friends</Text>
+              <View style={styles.headerActions}>
+                <TouchableOpacity 
+                  style={styles.headerButton}
+                  onPress={() => navigation.navigate('FriendRequests')}
+                >
+                  <Ionicons name="mail" size={24} color={COLORS.white} />
+                  {requestCount > 0 && (
+                    <View style={styles.badge}>
+                      <Text style={styles.badgeText}>{requestCount}</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.headerButton}
+                  onPress={() => navigation.navigate('UserSearch')}
+                >
+                  <Ionicons name="person-add" size={24} color={COLORS.white} />
+                </TouchableOpacity>
+              </View>
+            </View>
+            
+            <Text style={styles.subtitle}>
+              {friends.data.length} {friends.data.length === 1 ? 'friend' : 'friends'} connected
+            </Text>
+          </View>
+        </SafeAreaView>
+      </GradientBackground>
+
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <SearchBar
+          placeholder="Search friends..."
+          value={searchQuery}
+          onChangeText={handleSearch}
+          style={styles.searchBar}
+        />
       </View>
 
-      <FlatList
-        data={friends.data}
-        keyExtractor={item => item._id}
-        renderItem={renderFriendItem}
-        contentContainerStyle={{ paddingBottom: 32 }}
-        showsVerticalScrollIndicator={false}
-      />
-    </SafeAreaView>
+      {/* Content */}
+      <View style={styles.content}>
+        {isLoading ? (
+          <LoadingState message="Loading friends..." />
+        ) : friends.data.length === 0 ? (
+          <EmptyState
+            icon="people-outline"
+            title="No Friends Yet"
+            message="Start connecting with friends to share your location and see theirs"
+            actionText="Find Friends"
+            onAction={() => navigation.navigate('UserSearch')}
+          />
+        ) : (
+          <>
+            <SectionHeader
+              title={`${filteredFriends.length} Friends`}
+              subtitle={searchQuery ? `Showing results for "${searchQuery}"` : 'Your connected friends'}
+              style={styles.sectionHeader}
+            />
+            
+            <FlatList
+              data={filteredFriends}
+              keyExtractor={item => item._id}
+              renderItem={renderFriendItem}
+              contentContainerStyle={styles.listContent}
+              showsVerticalScrollIndicator={false}
+              refreshControl={
+                <RefreshControl
+                  refreshing={isRefreshing}
+                  onRefresh={handleRefresh}
+                  colors={[COLORS.primary]}
+                  tintColor={COLORS.primary}
+                />
+              }
+            />
+          </>
+        )}
+      </View>
+    </View>
   );
 };
 
 export default FriendsScreen;
 
 const styles = StyleSheet.create({
-  safeArea: {
+  container: {
     flex: 1,
-    backgroundColor: '#f0f4f8',
+    backgroundColor: COLORS.background,
   },
   header: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 15,
+    paddingBottom: SPACING.xl,
+  },
+  headerContent: {
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.md,
+  },
+  headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    backgroundColor: '#fff',
-    elevation: 2, // android shadow
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
+    alignItems: 'center',
+    marginBottom: SPACING.sm,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#1e3c72',
+    ...TYPOGRAPHY.h1,
+    color: COLORS.white,
+    fontWeight: '700',
   },
-  card: {
+  subtitle: {
+    ...TYPOGRAPHY.body1,
+    color: COLORS.white,
+    opacity: 0.9,
+  },
+  headerActions: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
-    marginHorizontal: 16,
-    marginVertical: 8,
-    padding: 16,
-    borderRadius: 14,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 },
     alignItems: 'center',
   },
-  avatarWrapper: {
+  headerButton: {
+    marginLeft: SPACING.md,
+    padding: SPACING.sm,
     position: 'relative',
   },
-  avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-  },
-  onlineIndicator: {
+  badge: {
     position: 'absolute',
-    bottom: 4,
-    right: 4,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: '#4ade80',
-    borderWidth: 2,
-    borderColor: '#fff',
-  },
-  info: {
-    flex: 1,
-    marginLeft: 16,
+    top: 0,
+    right: 0,
+    backgroundColor: COLORS.error,
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
     justifyContent: 'center',
-  },
-  name: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1e3c72',
-  },
-  locationRow: {
-    marginTop: 4,
-    flexDirection: 'row',
     alignItems: 'center',
+    borderWidth: 2,
+    borderColor: COLORS.white,
   },
-  locationText: {
-    marginLeft: 6,
-    fontSize: 14,
-    color: '#777',
-    fontWeight: '500',
+  badgeText: {
+    ...TYPOGRAPHY.overline,
+    color: COLORS.white,
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  searchContainer: {
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    backgroundColor: COLORS.white,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  searchBar: {
+    marginBottom: 0,
+  },
+  content: {
+    flex: 1,
+  },
+  sectionHeader: {
+    paddingTop: SPACING.lg,
+  },
+  listContent: {
+    paddingBottom: SPACING.xxxl,
   },
 });

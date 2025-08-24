@@ -14,5 +14,6 @@ router.put("/updateProfile", authenticateJWT, authController.updateProfile);
 router.get("/getProfile", authenticateJWT, authController.getProfile);
 router.post("/updateLocation", authenticateJWT, authController.updateLocation);
 router.get("/getAllUsers", authenticateJWT, authController.getAllUsers);
+router.get("/user/:userId", authenticateJWT, authController.getUserById);
 
 module.exports = router;

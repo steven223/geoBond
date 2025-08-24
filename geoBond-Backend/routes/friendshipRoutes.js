@@ -30,4 +30,16 @@ router.get('/friend/:friendId/location-history', authenticateJWT, friendshipCont
 // Get request history
 router.get('/requests/history', authenticateJWT, friendshipController.getRequestHistory);
 
+// Get friend request counts
+router.get('/requests/count', authenticateJWT, friendshipController.getRequestCounts);
+
+// Get user statistics
+router.get('/stats', authenticateJWT, friendshipController.getUserStats);
+
+// Get recent activities
+router.get('/activities/recent', authenticateJWT, friendshipController.getRecentActivities);
+
+// Get friends with online status
+router.get('/friends/status', authenticateJWT, friendshipController.getFriendsWithStatus);
+
 module.exports = router; 

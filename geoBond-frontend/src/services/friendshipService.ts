@@ -52,6 +52,36 @@ export interface LocationHistoryResponse {
   status: string;
 }
 
+export interface UserStats {
+  friends: number;
+  locations: number;
+  shared: number;
+}
+
+export interface RequestCounts {
+  incoming: number;
+  outgoing: number;
+  total: number;
+}
+
+export interface Activity {
+  id: string;
+  type: 'friend_request' | 'friend_accepted' | 'location_share' | 'location_update';
+  userName: string;
+  userId: string;
+  message: string;
+  timestamp: string;
+}
+
+export interface FriendWithStatus {
+  id: string;
+  name: string;
+  email: string;
+  status: 'online' | 'offline' | 'away';
+  location: string;
+  lastSeen: string;
+}
+
 // Search for users by email
 export const searchUsers = async (search: string): Promise<User[]> => {
   try {
@@ -151,6 +181,50 @@ export const getRequestHistory = async (): Promise<FriendRequest[]> => {
   }
 };
 
+// Get friend request counts
+export const getRequestCounts = async (): Promise<RequestCounts> => {
+  try {
+    const response = await api.get('/friendship/requests/count');
+    return response.data.data;
+  } catch (error) {
+    console.error('Get request counts error:', error);
+    throw error;
+  }
+};
+
+// Get user statistics
+export const getUserStats = async (): Promise<UserStats> => {
+  try {
+    const response = await api.get('/friendship/stats');
+    return response.data.data;
+  } catch (error) {
+    console.error('Get user stats error:', error);
+    throw error;
+  }
+};
+
+// Get recent activities
+export const getRecentActivities = async (limit: number = 10): Promise<Activity[]> => {
+  try {
+    const response = await api.get(`/friendship/activities/recent?limit=${limit}`);
+    return response.data.data;
+  } catch (error) {
+    console.error('Get recent activities error:', error);
+    throw error;
+  }
+};
+
+// Get friends with online status
+export const getFriendsWithStatus = async (): Promise<FriendWithStatus[]> => {
+  try {
+    const response = await api.get('/friendship/friends/status');
+    return response.data.data;
+  } catch (error) {
+    console.error('Get friends with status error:', error);
+    throw error;
+  }
+};
+
 export const friendShipService = {
   searchUsers,
   sendFriendRequest,
@@ -161,4 +235,8 @@ export const friendShipService = {
   getFriends,
   getFriendLocationHistory,
   getRequestHistory,
+  getRequestCounts,
+  getUserStats,
+  getRecentActivities,
+  getFriendsWithStatus,
 };

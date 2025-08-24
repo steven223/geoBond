@@ -92,7 +92,7 @@ exports.getIncomingRequests = async (req, res) => {
     const requests = await FriendRequest.find({
       toUserId: currentUserId,
       status: 'pending'
-    }).populate('fromUserId', 'email', 'fullName');
+    }).populate('fromUserId', 'email fullName');
 
     res.json({
       status: 'success',
@@ -216,7 +216,7 @@ exports.getFriends = async (req, res) => {
       ],
       status: 'accepted'
     }).populate('fromUserId', 'email fullName gender location')
-      .populate('toUserId', 'email fullName email fullName gender location');
+      .populate('toUserId', 'email fullName gender location');
 
     // Extract friend information
     const friends = acceptedRequests.map(request => {
@@ -297,8 +297,8 @@ exports.getRequestHistory = async (req, res) => {
         { fromUserId: currentUserId },
         { toUserId: currentUserId }
       ]
-    }).populate('fromUserId', 'email', 'fullName')
-      .populate('toUserId', 'email', 'fullName')
+    }).populate('fromUserId', 'email fullName')
+      .populate('toUserId', 'email fullName')
       .sort({ createdAt: -1 });
 
     res.json({
@@ -307,6 +307,196 @@ exports.getRequestHistory = async (req, res) => {
     });
   } catch (err) {
     console.error('Get request history error:', err);
+    res.status(500).json({
+      status: 'error',
+      message: 'Server error'
+    });
+  }
+};
+
+// 10. Get friend request counts
+exports.getRequestCounts = async (req, res) => {
+  try {
+    const currentUserId = req.user._id;
+
+    const [incomingCount, outgoingCount] = await Promise.all([
+      FriendRequest.countDocuments({
+        toUserId: currentUserId,
+        status: 'pending'
+      }),
+      FriendRequest.countDocuments({
+        fromUserId: currentUserId,
+        status: 'pending'
+      })
+    ]);
+
+    res.json({
+      status: 'success',
+      data: {
+        incoming: incomingCount,
+        outgoing: outgoingCount,
+        total: incomingCount + outgoingCount
+      }
+    });
+  } catch (err) {
+    console.error('Get request counts error:', err);
+    res.status(500).json({
+      status: 'error',
+      message: 'Server error'
+    });
+  }
+};
+
+// 11. Get user statistics
+exports.getUserStats = async (req, res) => {
+  try {
+    const currentUserId = req.user._id;
+
+    const [friendsCount, locationsCount, acceptedRequestsCount] = await Promise.all([
+      // Count accepted friends
+      FriendRequest.countDocuments({
+        $or: [
+          { fromUserId: currentUserId },
+          { toUserId: currentUserId }
+        ],
+        status: 'accepted'
+      }),
+      // Count user's location history
+      UserLocation.countDocuments({ userId: currentUserId }),
+      // Count total accepted requests (sent + received)
+      FriendRequest.countDocuments({
+        $or: [
+          { fromUserId: currentUserId },
+          { toUserId: currentUserId }
+        ],
+        status: 'accepted'
+      })
+    ]);
+
+    res.json({
+      status: 'success',
+      data: {
+        friends: friendsCount,
+        locations: locationsCount,
+        shared: acceptedRequestsCount
+      }
+    });
+  } catch (err) {
+    console.error('Get user stats error:', err);
+    res.status(500).json({
+      status: 'error',
+      message: 'Server error'
+    });
+  }
+};
+
+// 12. Get recent activities
+exports.getRecentActivities = async (req, res) => {
+  try {
+    const currentUserId = req.user._id;
+    const limit = parseInt(req.query.limit) || 10;
+
+    // Get recent friend requests (both sent and received)
+    const recentRequests = await FriendRequest.find({
+      $or: [
+        { fromUserId: currentUserId },
+        { toUserId: currentUserId }
+      ]
+    })
+    .populate('fromUserId', 'fullName email')
+    .populate('toUserId', 'fullName email')
+    .sort({ updatedAt: -1 })
+    .limit(limit);
+
+    // Transform to activity format
+    const activities = recentRequests.map(request => {
+      const isIncoming = request.toUserId._id.equals(currentUserId);
+      const otherUser = isIncoming ? request.fromUserId : request.toUserId;
+      
+      let type, message;
+      
+      if (request.status === 'pending') {
+        if (isIncoming) {
+          type = 'friend_request';
+          message = 'sent you a friend request';
+        } else {
+          type = 'friend_request';
+          message = 'received your friend request';
+        }
+      } else if (request.status === 'accepted') {
+        type = 'friend_accepted';
+        message = isIncoming ? 'accepted your friend request' : 'you accepted their friend request';
+      }
+
+      return {
+        id: request._id,
+        type,
+        userName: otherUser.fullName,
+        userId: otherUser._id,
+        message,
+        timestamp: request.updatedAt
+      };
+    });
+
+    res.json({
+      status: 'success',
+      data: activities
+    });
+  } catch (err) {
+    console.error('Get recent activities error:', err);
+    res.status(500).json({
+      status: 'error',
+      message: 'Server error'
+    });
+  }
+};
+
+// 13. Get friends with online status (mock for now)
+exports.getFriendsWithStatus = async (req, res) => {
+  try {
+    const currentUserId = req.user._id;
+    
+    // Get accepted friend requests
+    const acceptedRequests = await FriendRequest.find({
+      $or: [
+        { fromUserId: currentUserId },
+        { toUserId: currentUserId }
+      ],
+      status: 'accepted'
+    }).populate('fromUserId', 'fullName email location lastKnownLocation')
+      .populate('toUserId', 'fullName email location lastKnownLocation');
+
+    // Extract friend information with mock status
+    const friends = acceptedRequests.map(request => {
+      const friend = request.fromUserId._id.equals(currentUserId) 
+        ? request.toUserId 
+        : request.fromUserId;
+      
+      // Mock online status based on last known location timestamp
+      const lastLocationTime = friend.lastKnownLocation?.timestamp;
+      const now = new Date();
+      const timeDiff = lastLocationTime ? (now - new Date(lastLocationTime)) / (1000 * 60) : null; // minutes
+      
+      let status = 'offline';
+      if (timeDiff && timeDiff < 5) status = 'online';
+      else if (timeDiff && timeDiff < 30) status = 'away';
+      
+      return {
+        id: friend._id,
+        name: friend.fullName,
+        email: friend.email,
+        status,
+        location: friend.location?.city || 'Location not set',
+        lastSeen: timeDiff ? `${Math.floor(timeDiff)} minutes ago` : 'Long time ago'
+      };
+    });
+
+    res.json({
+      status: 'success',
+      data: friends
+    });
+  } catch (err) {
+    console.error('Get friends with status error:', err);
     res.status(500).json({
       status: 'error',
       message: 'Server error'
