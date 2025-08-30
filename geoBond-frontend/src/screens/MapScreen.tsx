@@ -1,6 +1,7 @@
 import React, { useContext, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Alert } from 'react-native';
 import { useLocationUpdates } from '../hooks/useLocationUpdates';
+import { useConnectedUsers } from '../hooks/useConnectedUsers';
 import { AuthContext } from '../context/AuthContext';
 import { locationService } from '../services/locationService';
 import Toast from 'react-native-toast-message';
@@ -8,6 +9,7 @@ import Toast from 'react-native-toast-message';
 const MapScreen = () => {
   const { user } = useContext(AuthContext);
   const { getAllLocations, locationUpdates } = useLocationUpdates();
+  const { connectedUsersCount } = useConnectedUsers();
   const [currentLocation, setCurrentLocation] = useState<any>(null);
 
   useEffect(() => {
@@ -54,15 +56,23 @@ const MapScreen = () => {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Other Users ({locationUpdates.size})</Text>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>People Online right now</Text>
+          <View style={styles.connectedUsersIndicator}>
+            <View style={styles.onlineIndicator} />
+            <Text style={styles.connectedUsersText}>
+              {connectedUsersCount} users connected now
+            </Text>
+          </View>
+        </View>
         {getAllLocations().length > 0 ? (
           getAllLocations().map((location, index) => (
             <View key={index} style={styles.locationItem}>
-              <Text style={styles.userId}>User: {location.userId}</Text>
+              {/* <Text style={styles.userId}>User: {location.userId}</Text>
               <Text style={styles.locationText}>
                 Lat: {location.lat.toFixed(6)}
                 {'\n'}Lng: {location.lng.toFixed(6)}
-              </Text>
+              </Text> */}
             </View>
           ))
         ) : (
@@ -75,7 +85,7 @@ const MapScreen = () => {
           Status: {locationService.isLocationTracking() ? '🟢 Tracking' : '🔴 Not Tracking'}
         </Text>
         <Text style={styles.statusText}>
-          Connected Users: {locationUpdates.size}
+          Sharing Location: {locationUpdates.size} friends receiving updates
         </Text>
       </View>
     </View>
@@ -106,11 +116,35 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
+  sectionHeader: {
+    marginBottom: 10,
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    marginBottom: 10,
+    marginBottom: 8,
     color: '#333',
+  },
+  connectedUsersIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e8f5e8',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    alignSelf: 'flex-start',
+  },
+  onlineIndicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#4CAF50',
+    marginRight: 6,
+  },
+  connectedUsersText: {
+    fontSize: 12,
+    color: '#2d5a2d',
+    fontWeight: '500',
   },
   locationText: {
     fontSize: 14,

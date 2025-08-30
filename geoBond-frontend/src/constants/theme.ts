@@ -105,6 +105,7 @@ export const GRADIENTS = {
   purple: ['#667eea', '#764ba2'],
   blue: ['#4facfe', '#00f2fe'],
   teal: ['#4fd1c7', '#38b2ac'],
+  warning: ['#FF9500', '#FF6B35'],
 };
 
 // Spacing

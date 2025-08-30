@@ -13,17 +13,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
 import { Friend, FriendsResponse, friendShipService } from '../services/friendshipService';
-import { COLORS, SPACING, TYPOGRAPHY, SHADOWS } from '../constants/theme';
+import { COLORS, SPACING, TYPOGRAPHY } from '../constants/theme';
 import LoadingState from '../components/LoadingState';
 import EmptyState from '../components/EmptyState';
 import GradientBackground from '../components/GradientBackground';
 import SectionHeader from '../components/SectionHeader';
 import FriendCard from '../components/FriendCard';
 import SearchBar from '../components/SearchBar';
+import { useChat } from '../context/ChatContext';
 
 
 const FriendsScreen = () => {
   const navigation = useNavigation<any>();
+  const { createConversation } = useChat();
   const [friends, setFriends] = useState<FriendsResponse>({
     data: [],
     status: '',
@@ -48,12 +50,12 @@ const FriendsScreen = () => {
       } else {
         setIsLoading(true);
       }
-      
+
       const [friendsResponse, countsResponse] = await Promise.all([
         friendShipService.getFriends(),
         friendShipService.getRequestCounts(),
       ]);
-      
+
       setFriends(friendsResponse);
       setFilteredFriends(friendsResponse.data);
       setRequestCount(countsResponse.incoming);
@@ -87,6 +89,23 @@ const FriendsScreen = () => {
     fetchFriendsList(true);
   };
 
+  const handleStartChat = async (friend: Friend) => {
+    try {
+      const conversation = await createConversation(friend._id);
+      navigation.navigate('Chat', {
+        conversationId: conversation._id,
+        participantName: friend.fullName
+      });
+    } catch (error) {
+      console.error('Error starting chat:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Failed to start conversation'
+      });
+    }
+  };
+
   const renderFriendItem = ({ item }: { item: Friend }) => (
     <FriendCard
       name={item.fullName}
@@ -95,13 +114,7 @@ const FriendsScreen = () => {
       lastSeen={Math.random() > 0.5 ? '2 hours ago' : undefined}
       onPress={() => navigation.navigate('UserProfile', { userId: item._id })}
       onLocationPress={() => navigation.navigate('FriendLocation', { friendId: item._id })}
-      onMessagePress={() => {
-        Toast.show({
-          type: 'info',
-          text1: 'Coming Soon',
-          text2: 'Messaging feature will be available soon!',
-        });
-      }}
+      onMessagePress={() => handleStartChat(item)}
     />
   );
 
@@ -112,7 +125,7 @@ const FriendsScreen = () => {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
-      
+
       {/* Header with gradient */}
       <GradientBackground gradient="primary" style={styles.header}>
         <SafeAreaView>
@@ -120,7 +133,13 @@ const FriendsScreen = () => {
             <View style={styles.headerTop}>
               <Text style={styles.title}>My Friends</Text>
               <View style={styles.headerActions}>
-                <TouchableOpacity 
+                <TouchableOpacity
+                  style={styles.headerButton}
+                  onPress={() => navigation.navigate('ChatList')}
+                >
+                  <Ionicons name="chatbubbles" size={24} color={COLORS.white} />
+                </TouchableOpacity>
+                <TouchableOpacity
                   style={styles.headerButton}
                   onPress={() => navigation.navigate('FriendRequests')}
                 >
@@ -131,7 +150,7 @@ const FriendsScreen = () => {
                     </View>
                   )}
                 </TouchableOpacity>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.headerButton}
                   onPress={() => navigation.navigate('UserSearch')}
                 >
@@ -139,7 +158,7 @@ const FriendsScreen = () => {
                 </TouchableOpacity>
               </View>
             </View>
-            
+
             <Text style={styles.subtitle}>
               {friends.data.length} {friends.data.length === 1 ? 'friend' : 'friends'} connected
             </Text>
@@ -176,7 +195,7 @@ const FriendsScreen = () => {
               subtitle={searchQuery ? `Showing results for "${searchQuery}"` : 'Your connected friends'}
               style={styles.sectionHeader}
             />
-            
+
             <FlatList
               data={filteredFriends}
               keyExtractor={item => item._id}
@@ -262,7 +281,7 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.md,
     backgroundColor: COLORS.white,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    borderBottomColor: COLORS.gray200,
   },
   searchBar: {
     marginBottom: 0,

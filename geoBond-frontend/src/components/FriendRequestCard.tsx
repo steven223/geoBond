@@ -16,6 +16,7 @@ interface FriendRequestCardProps {
   onReject?: (requestId: string) => void;
   onUserPress?: (userId: string) => void;
   isLoading?: boolean;
+  profileImageUrl?: string;
 }
 
 const FriendRequestCard: React.FC<FriendRequestCardProps> = ({
@@ -25,6 +26,7 @@ const FriendRequestCard: React.FC<FriendRequestCardProps> = ({
   onReject,
   onUserPress,
   isLoading = false,
+  profileImageUrl,
 }) => {
   const user = type === 'incoming' ? request.fromUserId : request.toUserId;
   
@@ -82,8 +84,8 @@ const FriendRequestCard: React.FC<FriendRequestCardProps> = ({
         activeOpacity={0.7}
       >
         <View style={styles.avatarContainer}>
-          {user.profileImageUrl ? (
-            <Image source={{ uri: user.profileImageUrl }} style={styles.avatar} />
+          {profileImageUrl ? (
+            <Image source={{ uri: profileImageUrl }} style={styles.avatar} />
           ) : (
             <View style={styles.avatarPlaceholder}>
               <Text style={styles.avatarText}>{getInitials(user.fullName)}</Text>

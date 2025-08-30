@@ -78,13 +78,21 @@ export const AuthProvider = ({ children }: Props) => {
     const logout = async () => {
         try {
             // Stop location tracking before logout
-            await locationService.stopLocationTracking();
+            try {
+                await locationService.stopLocationTracking();
+            } catch (locationError) {
+                console.error('❌ Error stopping location tracking:', locationError);
+            }
             
             // Disconnect socket if connected
-            const socket = getSocket();
-            if (socket && socket.connected) {
-                socket.disconnect();
-                console.log('🧹 Socket disconnected during logout');
+            try {
+                const socket = getSocket();
+                if (socket && socket.connected) {
+                    socket.disconnect();
+                    console.log('🧹 Socket disconnected during logout');
+                }
+            } catch (socketError) {
+                console.error('❌ Error disconnecting socket:', socketError);
             }
             
             // Clear user data
@@ -108,25 +116,45 @@ export const AuthProvider = ({ children }: Props) => {
     useEffect(() => {
         if (user) {
             // Initialize and connect socket
-            initSocket();
-            const socket = getSocket();
-            socket.connect();
-            socket.emit('register', user._id);
-            console.log('🔗 Socket connected and register emitted:', user._id);
+            try {
+                initSocket();
+                const socket = getSocket();
+                if (socket) {
+                    socket.connect();
+                    socket.emit('register', user._id);
+                    console.log('🔗 Socket connected and register emitted:', user._id);
+                }
+            } catch (socketError) {
+                console.error('❌ Error initializing socket:', socketError);
+            }
 
             // Start location tracking with user ID
-            locationService.startLocationTracking(user._id);
+            try {
+                locationService.startLocationTracking(user._id);
+            } catch (locationError) {
+                console.error('❌ Error starting location tracking:', locationError);
+            }
 
             return () => {
                 // Cleanup socket connection on user change (logout)
-                socket.disconnect();
-                console.log('🧹 Socket disconnected');
+                try {
+                    const socket = getSocket();
+                    if (socket && socket.connected) {
+                        socket.disconnect();
+                        console.log('🧹 Socket disconnected');
+                    }
+                } catch (socketError) {
+                    console.error('❌ Error disconnecting socket in cleanup:', socketError);
+                }
                 
                 // Stop location tracking
-                locationService.stopLocationTracking();
+                try {
+                    locationService.stopLocationTracking();
+                } catch (locationError) {
+                    console.error('❌ Error stopping location tracking in cleanup:', locationError);
+                }
             };
         }
-        if (!user) return;
     }, [user]);
 
     const setHasSeenWelcome = async (seen: boolean) => {

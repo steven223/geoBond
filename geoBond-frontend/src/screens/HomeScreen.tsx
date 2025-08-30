@@ -13,6 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { AuthContext } from '../context/AuthContext';
+import { useConnectedUsers } from '../hooks/useConnectedUsers';
 import Toast from 'react-native-toast-message';
 import { COLORS, SPACING, TYPOGRAPHY, SHADOWS, GRADIENTS } from '../constants/theme';
 import HeroSection from '../components/HeroSection';
@@ -24,52 +25,28 @@ import FriendCard from '../components/FriendCard';
 import MapPreview from '../components/MapPreview';
 import LoadingState from '../components/LoadingState';
 import { friendShipService, UserStats, Activity, FriendWithStatus, RequestCounts } from '../services/friendshipService';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 const { width } = Dimensions.get('window');
 
-// Quick actions for the home screen
-const quickActions = [
-  { 
-    id: '1', 
-    title: 'Find Friends', 
-    subtitle: 'Search & connect',
-    icon: 'search' as const, 
-    screen: 'UserSearch', 
-    gradient: 'primary' as const,
-  },
-  { 
-    id: '2', 
-    title: 'Share Location', 
-    subtitle: 'Let friends find you',
-    icon: 'location' as const, 
-    screen: 'MapScreen', 
-    gradient: 'accent' as const,
-  },
-  { 
-    id: '3', 
-    title: 'Friend Requests', 
-    subtitle: 'Manage connections',
-    icon: 'person-add' as const, 
-    screen: 'FriendRequests', 
-    gradient: 'secondary' as const,
-  },
-  { 
-    id: '4', 
-    title: 'My Profile', 
-    subtitle: 'Edit your info',
-    icon: 'person' as const, 
-    screen: 'Profile', 
-    gradient: 'purple' as const,
-  },
-];
-
-
-
+// Quick actions for the home screen - moved inside component to access connectedUsersCount
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+type QuickAction = {
+  id: string;
+  title: string;
+  subtitle: string;
+  icon: 'search' | 'location';
+  screen: keyof RootStackParamList;   // 👈 important
+  gradient: 'primary' | 'accent';
+  badge?: number;
+};
 
 
 const HomeScreen = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NavigationProp>();
+  // const navigation = useNavigation();
   const { logout, user } = useContext(AuthContext);
+  const { connectedUsersCount } = useConnectedUsers();
   const [refreshing, setRefreshing] = useState(false);
   const [stats, setStats] = useState<UserStats>({
     friends: 0,
@@ -94,7 +71,7 @@ const HomeScreen = () => {
   const loadHomeData = async () => {
     try {
       setIsLoading(true);
-      
+
       // Load all data in parallel
       const [statsData, activitiesData, friendsData, countsData] = await Promise.all([
         friendShipService.getUserStats(),
@@ -130,7 +107,7 @@ const HomeScreen = () => {
         visibilityTime: 5000,
         onPress: async () => {
           Toast.hide();
-          
+
           // Show loading toast
           Toast.show({
             type: 'info',
@@ -141,7 +118,7 @@ const HomeScreen = () => {
           try {
             // Perform logout
             await logout();
-            
+
             // Show success message
             Toast.show({
               type: 'success',
@@ -191,6 +168,76 @@ const HomeScreen = () => {
 
   // Function to render quick actions grid
   const renderQuickActions = () => {
+    const quickActions = [
+      {
+        id: '1',
+        title: 'Find Friends',
+        subtitle: 'Search & connect',
+        icon: 'search' as const,
+        screen: 'UserSearch',
+        gradient: 'primary' as const,
+      },
+      {
+        id: '2',
+        title: 'Share Location',
+        subtitle: `${connectedUsersCount} users online`,
+        icon: 'location' as const,
+        screen: 'MapScreen',
+        gradient: 'accent' as const,
+        badge: connectedUsersCount > 0 ? connectedUsersCount : undefined,
+      },
+      {
+        id: '3',
+        title: 'Friend Requests',
+        subtitle: 'Manage connections',
+        icon: 'person-add' as const,
+        screen: 'FriendRequests',
+        gradient: 'secondary' as const,
+      },
+      {
+        id: '4',
+        title: 'My Profile',
+        subtitle: 'Edit your info',
+        icon: 'person' as const,
+        screen: 'Profile',
+        gradient: 'purple' as const,
+      },
+    ];
+    // const quickActions: QuickAction[] = [
+    //   {
+    //     id: '1',
+    //     title: 'Find Friends',
+    //     subtitle: 'Search & connect',
+    //     icon: 'search',
+    //     screen: 'UserSearch',
+    //     gradient: 'primary',
+    //   },
+    //   {
+    //     id: '2',
+    //     title: 'Share Location',
+    //     subtitle: `${connectedUsersCount} users online`,
+    //     icon: 'location',
+    //     screen: 'MapScreen',
+    //     gradient: 'accent',
+    //     badge: connectedUsersCount > 0 ? connectedUsersCount : undefined,
+    //   },
+    //   {
+    //     id: '3',
+    //     title: 'Friend Requests',
+    //     subtitle: 'Manage connections',
+    //     icon: 'person-add',
+    //     screen: 'FriendRequests',
+    //     gradient: 'secondary',
+    //   },
+    //   {
+    //     id: '4',
+    //     title: 'My Profile',
+    //     subtitle: 'Edit your info',
+    //     icon: 'person',
+    //     screen: 'Profile',
+    //     gradient: 'purple',
+    //   },
+    // ];
     return (
       <View style={styles.quickActionsContainer}>
         <View style={styles.quickActionsRow}>
@@ -200,7 +247,7 @@ const HomeScreen = () => {
             icon={quickActions[0].icon}
             gradient={quickActions[0].gradient}
             badge={quickActions[0].badge}
-            onPress={() => navigation.navigate(quickActions[0].screen)}
+            onPress={() => navigation.navigate(quickActions[0].screen)} // ✅ no error
             style={styles.quickActionCard}
           />
           <QuickActionCard
@@ -269,7 +316,7 @@ const HomeScreen = () => {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
-      
+
       {isLoading ? (
         <LoadingState message="Loading your dashboard..." />
       ) : (
@@ -285,144 +332,148 @@ const HomeScreen = () => {
             />
           }
         >
-        {/* Hero Section */}
-        <HeroSection
-          userName={user?.fullName || 'User'}
-          subtitle="Ready to connect and share?"
-          style={styles.heroSection}
-        />
-
-        {/* Header with logout button */}
-        <View style={styles.headerActions}>
-          <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
-            <Ionicons name="log-out-outline" size={20} color={COLORS.error} />
-            <Text style={styles.logoutText}>Logout</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Quick Stats */}
-        <View style={styles.section}>
-          <SectionHeader
-            title="Your Stats"
-            subtitle="Your GeoBond activity overview"
-            icon="stats-chart"
+          {/* Hero Section */}
+          <HeroSection
+            userName={user?.fullName || 'User'}
+            subtitle="Ready to connect and share?"
+            style={styles.heroSection}
           />
-          {renderStats()}
-        </View>
 
-        {/* Quick Actions */}
-        <View style={styles.section}>
-          <SectionHeader
-            title="Quick Actions"
-            subtitle="What would you like to do?"
-            icon="flash"
-          />
-          {renderQuickActions()}
-        </View>
-
-        {/* Recent Activity */}
-        <View style={styles.section}>
-          <SectionHeader
-            title="Recent Activity"
-            subtitle="Latest updates from your network"
-            actionText="View All"
-            onActionPress={() => {
-              Toast.show({
-                type: 'info',
-                text1: 'Coming Soon',
-                text2: 'Activity screen will be available soon!',
-              });
-            }}
-            icon="time"
-          />
-          <View style={styles.activityList}>
-            {recentActivities.length > 0 ? (
-              recentActivities.map((activity) => (
-                <ActivityItem
-                  key={activity.id}
-                  type={activity.type}
-                  userName={activity.userName}
-                  message={activity.message}
-                  timestamp={new Date(activity.timestamp).toLocaleString()}
-                  onPress={() => {
-                    // Handle activity item press
-                    navigation.navigate('UserProfile', { userId: activity.userId });
-                  }}
-                />
-              ))
-            ) : (
-              <View style={{ padding: SPACING.lg, alignItems: 'center' }}>
-                <Text style={[TYPOGRAPHY.body2, { color: COLORS.textSecondary }]}>
-                  No recent activities
-                </Text>
-              </View>
-            )}
+          {/* Header with logout button */}
+          <View style={styles.headerActions}>
+            <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
+              <Ionicons name="log-out-outline" size={20} color={COLORS.error} />
+              <Text style={styles.logoutText}>Logout</Text>
+            </TouchableOpacity>
           </View>
-        </View>
 
-        {/* Map Preview */}
-        <View style={styles.section}>
-          <SectionHeader
-            title="Location Map"
-            subtitle="See where your friends are"
-            actionText="Open Map"
-            onActionPress={() => navigation.navigate('MapScreen')}
-            icon="map"
-          />
-          <MapPreview
-            friendsCount={friendHighlights.filter(f => f.status === 'online').length}
-            onPress={() => navigation.navigate('MapScreen')}
-          />
-        </View>
-
-        {/* Friend Highlights */}
-        <View style={styles.section}>
-          <SectionHeader
-            title="Friends Online"
-            subtitle="See who's active right now"
-            actionText="View All"
-            onActionPress={() => navigation.navigate('Friends')}
-            icon="people"
-          />
-          <View style={styles.friendsList}>
-            {friendHighlights.length > 0 ? (
-              friendHighlights.map((friend) => (
-                <FriendCard
-                  key={friend.id}
-                  name={friend.name}
-                  status={friend.status}
-                  location={friend.location}
-                  lastSeen={friend.status === 'offline' ? friend.lastSeen : undefined}
-                  compact
-                  onPress={() => navigation.navigate('UserProfile', { userId: friend.id })}
-                  onLocationPress={() => navigation.navigate('MapScreen', { userId: friend.id })}
-                  onMessagePress={() => {
-                    Toast.show({
-                      type: 'info',
-                      text1: 'Coming Soon',
-                      text2: 'Messaging feature will be available soon!',
-                    });
-                  }}
-                />
-              ))
-            ) : (
-              <View style={{ padding: SPACING.lg, alignItems: 'center' }}>
-                <Text style={[TYPOGRAPHY.body2, { color: COLORS.textSecondary }]}>
-                  No friends online right now
-                </Text>
-              </View>
-            )}
+          {/* Quick Stats */}
+          <View style={styles.section}>
+            <SectionHeader
+              title="Your Stats"
+              subtitle="Your GeoBond activity overview"
+              icon="stats-chart"
+            />
+            {renderStats()}
           </View>
-        </View>
 
-        {/* Bottom spacing */}
-        <View style={{ height: SPACING.xxxl }} />
+          {/* Quick Actions */}
+          <View style={styles.section}>
+            <SectionHeader
+              title="Quick Actions"
+              subtitle="What would you like to do?"
+              icon="flash"
+            />
+            {renderQuickActions()}
+          </View>
+
+          {/* Recent Activity */}
+          <View style={styles.section}>
+            <SectionHeader
+              title="Recent Activity"
+              subtitle="Latest updates from your network"
+              actionText="View All"
+              onActionPress={() => {
+                Toast.show({
+                  type: 'info',
+                  text1: 'Coming Soon',
+                  text2: 'Activity screen will be available soon!',
+                });
+              }}
+              icon="time"
+            />
+            <View style={styles.activityList}>
+              {recentActivities.length > 0 ? (
+                recentActivities.map((activity) => (
+                  <ActivityItem
+                    key={activity.id}
+                    type={activity.type}
+                    userName={activity.userName}
+                    message={activity.message}
+                    timestamp={new Date(activity.timestamp).toLocaleString()}
+                    onPress={() => {
+                      // Handle activity item press
+                      navigation.navigate('UserProfile', { userId: activity.userId });
+                    }}
+                  />
+                ))
+              ) : (
+                <View style={{ padding: SPACING.lg, alignItems: 'center' }}>
+                  <Text style={[TYPOGRAPHY.body2, { color: COLORS.textSecondary }]}>
+                    No recent activities
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+
+          {/* Map Preview */}
+          <View style={styles.section}>
+            <SectionHeader
+              title="Location Map"
+              subtitle="See where your friends are"
+              actionText="Open Map"
+              onActionPress={() => navigation.navigate('MapScreen')}
+              icon="map"
+            />
+            <MapPreview
+              friendsCount={friendHighlights.filter(f => f.status === 'online').length}
+              onPress={() => navigation.navigate('MapScreen')}
+            />
+          </View>
+
+          {/* Friend Highlights */}
+          <View style={styles.section}>
+            <SectionHeader
+              title="Friends Online"
+              subtitle="See who's active right now"
+              actionText="View All"
+              onActionPress={() => navigation.navigate('Friends')}
+              icon="people"
+            />
+            <View style={styles.friendsList}>
+              {friendHighlights.length > 0 ? (
+                friendHighlights.map((friend) => (
+                  <FriendCard
+                    key={friend.id}
+                    name={friend.name}
+                    status={friend.status}
+                    location={friend.location}
+                    lastSeen={friend.status === 'offline' ? friend.lastSeen : undefined}
+                    compact
+                    onPress={() => navigation.navigate('UserProfile', { userId: friend.id })}
+                    onLocationPress={() => navigation.navigate('MapScreen', { userId: friend.id })}
+                    onMessagePress={() => {
+                      Toast.show({
+                        type: 'info',
+                        text1: 'Coming Soon',
+                        text2: 'Messaging feature will be available soon!',
+                      });
+                    }}
+                  />
+                ))
+              ) : (
+                <View style={{ padding: SPACING.lg, alignItems: 'center' }}>
+                  <Text style={[TYPOGRAPHY.body2, { color: COLORS.textSecondary }]}>
+                    No friends online right now
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+
+          {/* Bottom spacing */}
+          <View style={{ height: SPACING.xxxl }} />
         </ScrollView>
       )}
     </View>
   );
 };
-
+export type RootStackParamList = {
+  UserSearch: undefined;
+  UserProfile: { userId: string };
+  Home: undefined;
+};
 export default HomeScreen;
 
 const styles = StyleSheet.create({

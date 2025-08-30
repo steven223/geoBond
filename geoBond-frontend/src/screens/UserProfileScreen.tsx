@@ -42,6 +42,12 @@ const UserProfileScreen: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSendingRequest, setIsSendingRequest] = useState(false);
   const [requestSent, setRequestSent] = useState(false);
+  const [friendshipStatus, setFriendshipStatus] = useState<{
+    isFriend: boolean;
+    hasPendingRequest: boolean;
+    requestDirection?: 'sent' | 'received';
+    requestId?: string;
+  } | null>(null);
 
   useEffect(() => {
     loadUserProfile();
@@ -58,6 +64,7 @@ const UserProfileScreen: React.FC = () => {
 
   const loadUserProfile = async () => {
     if (!userId || !currentUser) {
+      console.warn('Missing userId or currentUser:', { userId, currentUser: !!currentUser });
       setIsLoading(false);
       return;
     }
@@ -72,6 +79,25 @@ const UserProfileScreen: React.FC = () => {
         profile = await userService.getCurrentUserProfile();
       } else {
         profile = await userService.getUserProfile(userId);
+
+        // Check friendship status for other users
+        try {
+          const status = await friendShipService.checkFriendshipStatus(userId);
+          setFriendshipStatus(status);
+
+          // Set requestSent based on existing status
+          if (status?.hasPendingRequest && status.requestDirection === 'sent') {
+            setRequestSent(true);
+          }
+        } catch (statusError) {
+          console.error('Failed to check friendship status:', statusError);
+          // Continue without friendship status if the API doesn't exist yet
+          setFriendshipStatus(null);
+        }
+      }
+
+      if (!profile) {
+        throw new Error('Profile data is empty');
       }
 
       setUserProfile(profile);
@@ -80,12 +106,16 @@ const UserProfileScreen: React.FC = () => {
       Toast.show({
         type: 'error',
         text1: 'Profile Load Failed',
-        text2: error.message || 'Failed to load user profile',
+        text2: error?.message || 'Failed to load user profile',
       });
 
-      // Only navigate back if we're not in the main profile tab
-      if (route.params?.userId) {
-        navigation.goBack();
+      // Only navigate back if we're not in the main profile tab and navigation is available
+      if (route.params?.userId && navigation?.goBack) {
+        try {
+          navigation.goBack();
+        } catch (navError) {
+          console.error('Navigation error:', navError);
+        }
       }
     } finally {
       setIsLoading(false);
@@ -110,6 +140,14 @@ const UserProfileScreen: React.FC = () => {
               setIsSendingRequest(true);
               await friendShipService.sendFriendRequest(userProfile._id);
               setRequestSent(true);
+
+              // Update friendship status
+              setFriendshipStatus(prev => ({
+                ...prev,
+                isFriend: false,
+                hasPendingRequest: true,
+                requestDirection: 'sent',
+              }));
 
               Toast.show({
                 type: 'success',
@@ -139,22 +177,82 @@ const UserProfileScreen: React.FC = () => {
     );
   };
 
+  const handleAcceptFriendRequest = async () => {
+    if (!userProfile || !friendshipStatus?.requestId) return;
+
+    Alert.alert(
+      'Accept Friend Request',
+      `Accept friend request from ${userProfile.fullName}?`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Accept',
+          onPress: async () => {
+            try {
+              setIsSendingRequest(true);
+              await friendShipService.acceptFriendRequest(friendshipStatus.requestId!);
+
+              // Update friendship status
+              setFriendshipStatus(prev => ({
+                ...prev,
+                isFriend: true,
+                hasPendingRequest: false,
+                requestDirection: undefined,
+                requestId: undefined,
+              }));
+
+              Toast.show({
+                type: 'success',
+                text1: 'Friend Request Accepted',
+                text2: `You are now friends with ${userProfile.fullName}`,
+              });
+            } catch (error: any) {
+              console.error('Accept friend request error:', error);
+              Toast.show({
+                type: 'error',
+                text1: 'Accept Failed',
+                text2: 'Failed to accept friend request',
+              });
+            } finally {
+              setIsSendingRequest(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const getInitials = (name: string) => {
+    if (!name || typeof name !== 'string') {
+      return 'U';
+    }
     return name
       .split(' ')
-      .map(n => n[0])
+      .map(n => n?.[0] || '')
       .join('')
       .toUpperCase()
-      .slice(0, 2);
+      .slice(0, 2) || 'U';
   };
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
+    if (!dateString) return 'Not specified';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return 'Invalid date';
+      }
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
+    } catch (error) {
+      console.error('Date formatting error:', error);
+      return 'Invalid date';
+    }
   };
 
   const formatLocation = () => {
@@ -165,20 +263,40 @@ const UserProfileScreen: React.FC = () => {
   };
 
   const calculateAge = (dob: string) => {
-    const birthDate = new Date(dob);
-    const today = new Date();
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (!dob) return 0;
+    try {
+      const birthDate = new Date(dob);
+      if (isNaN(birthDate.getTime())) {
+        return 0;
+      }
+      const today = new Date();
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
 
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+
+      return age > 0 ? age : 0;
+    } catch (error) {
+      console.error('Age calculation error:', error);
+      return 0;
     }
-
-    return age;
   };
 
   const handleEditProfile = () => {
-    navigation.navigate('EditProfile' as never, { userProfile } as never);
+    try {
+      if (navigation?.navigate && userProfile) {
+        navigation.navigate('EditProfile' as never, { userProfile } as never);
+      }
+    } catch (error) {
+      console.error('Navigation to EditProfile failed:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Navigation Error',
+        text2: 'Failed to open edit profile screen',
+      });
+    }
   };
 
   const handleLogout = () => {
@@ -319,27 +437,61 @@ const UserProfileScreen: React.FC = () => {
             </View>
 
             {!isOwnProfile && (
-              <TouchableOpacity
-                style={[
-                  styles.friendRequestButton,
-                  requestSent && styles.friendRequestButtonSent,
-                  isSendingRequest && styles.friendRequestButtonLoading,
-                ]}
-                onPress={handleSendFriendRequest}
-                disabled={requestSent || isSendingRequest}
-                activeOpacity={0.7}
-              >
-                {isSendingRequest ? (
-                  <Ionicons name="hourglass-outline" size={20} color="#fff" />
-                ) : requestSent ? (
-                  <Ionicons name="checkmark" size={20} color="#fff" />
+              <View style={styles.friendActionContainer}>
+                {friendshipStatus?.isFriend ? (
+                  // Already friends
+                  <View style={[styles.friendRequestButton, styles.friendsButton]}>
+                    <Ionicons name="people" size={20} color="#fff" />
+                    <Text style={styles.friendRequestButtonText}>Friends</Text>
+                  </View>
+                ) : friendshipStatus?.hasPendingRequest ? (
+                  // Has pending request
+                  friendshipStatus.requestDirection === 'received' ? (
+                    // Incoming request - show accept button
+                    <TouchableOpacity
+                      style={[styles.friendRequestButton, styles.acceptButton]}
+                      onPress={handleAcceptFriendRequest}
+                      disabled={isSendingRequest}
+                      activeOpacity={0.7}
+                    >
+                      {isSendingRequest ? (
+                        <Ionicons name="hourglass-outline" size={20} color="#fff" />
+                      ) : (
+                        <Ionicons name="checkmark" size={20} color="#fff" />
+                      )}
+                      <Text style={styles.friendRequestButtonText}>
+                        {isSendingRequest ? 'Accepting...' : 'Accept Request'}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : (
+                    // Outgoing request - show request sent
+                    <View style={[styles.friendRequestButton, styles.friendRequestButtonSent]}>
+                      <Ionicons name="checkmark" size={20} color="#fff" />
+                      <Text style={styles.friendRequestButtonText}>Request Sent</Text>
+                    </View>
+                  )
                 ) : (
-                  <Ionicons name="person-add" size={20} color="#fff" />
+                  // No relationship - show send request button
+                  <TouchableOpacity
+                    style={[
+                      styles.friendRequestButton,
+                      isSendingRequest && styles.friendRequestButtonLoading,
+                    ]}
+                    onPress={handleSendFriendRequest}
+                    disabled={isSendingRequest}
+                    activeOpacity={0.7}
+                  >
+                    {isSendingRequest ? (
+                      <Ionicons name="hourglass-outline" size={20} color="#fff" />
+                    ) : (
+                      <Ionicons name="person-add" size={20} color="#fff" />
+                    )}
+                    <Text style={styles.friendRequestButtonText}>
+                      {isSendingRequest ? 'Sending...' : 'Send Friend Request'}
+                    </Text>
+                  </TouchableOpacity>
                 )}
-                <Text style={styles.friendRequestButtonText}>
-                  {isSendingRequest ? 'Sending...' : requestSent ? 'Request Sent' : 'Send Friend Request'}
-                </Text>
-              </TouchableOpacity>
+              </View>
             )}
           </View>
         </LinearGradient>
@@ -420,8 +572,6 @@ const UserProfileScreen: React.FC = () => {
             </View>
           </View>
         </View>
-
-
       </ScrollView>
     </SafeAreaView>
   );
@@ -575,6 +725,9 @@ const styles = StyleSheet.create({
     color: '#B8860B',
     marginLeft: 4,
   },
+  friendActionContainer: {
+    alignItems: 'center',
+  },
   friendRequestButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -590,6 +743,12 @@ const styles = StyleSheet.create({
   },
   friendRequestButtonLoading: {
     backgroundColor: '#999',
+  },
+  friendsButton: {
+    backgroundColor: '#34C759',
+  },
+  acceptButton: {
+    backgroundColor: '#FF9500',
   },
   friendRequestButtonText: {
     color: '#fff',

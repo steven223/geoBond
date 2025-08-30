@@ -220,10 +220,10 @@ exports.getFriends = async (req, res) => {
 
     // Extract friend information
     const friends = acceptedRequests.map(request => {
-      const friend = request.fromUserId._id.equals(currentUserId) 
-        ? request.toUserId 
+      const friend = request.fromUserId._id.equals(currentUserId)
+        ? request.toUserId
         : request.fromUserId;
-      
+
       return {
         _id: friend._id,
         email: friend.email,
@@ -403,18 +403,18 @@ exports.getRecentActivities = async (req, res) => {
         { toUserId: currentUserId }
       ]
     })
-    .populate('fromUserId', 'fullName email')
-    .populate('toUserId', 'fullName email')
-    .sort({ updatedAt: -1 })
-    .limit(limit);
+      .populate('fromUserId', 'fullName email')
+      .populate('toUserId', 'fullName email')
+      .sort({ updatedAt: -1 })
+      .limit(limit);
 
     // Transform to activity format
     const activities = recentRequests.map(request => {
       const isIncoming = request.toUserId._id.equals(currentUserId);
       const otherUser = isIncoming ? request.fromUserId : request.toUserId;
-      
+
       let type, message;
-      
+
       if (request.status === 'pending') {
         if (isIncoming) {
           type = 'friend_request';
@@ -455,7 +455,7 @@ exports.getRecentActivities = async (req, res) => {
 exports.getFriendsWithStatus = async (req, res) => {
   try {
     const currentUserId = req.user._id;
-    
+
     // Get accepted friend requests
     const acceptedRequests = await FriendRequest.find({
       $or: [
@@ -468,19 +468,19 @@ exports.getFriendsWithStatus = async (req, res) => {
 
     // Extract friend information with mock status
     const friends = acceptedRequests.map(request => {
-      const friend = request.fromUserId._id.equals(currentUserId) 
-        ? request.toUserId 
+      const friend = request.fromUserId._id.equals(currentUserId)
+        ? request.toUserId
         : request.fromUserId;
-      
+
       // Mock online status based on last known location timestamp
       const lastLocationTime = friend.lastKnownLocation?.timestamp;
       const now = new Date();
       const timeDiff = lastLocationTime ? (now - new Date(lastLocationTime)) / (1000 * 60) : null; // minutes
-      
+
       let status = 'offline';
       if (timeDiff && timeDiff < 5) status = 'online';
       else if (timeDiff && timeDiff < 30) status = 'away';
-      
+
       return {
         id: friend._id,
         name: friend.fullName,
@@ -497,6 +497,83 @@ exports.getFriendsWithStatus = async (req, res) => {
     });
   } catch (err) {
     console.error('Get friends with status error:', err);
+    res.status(500).json({
+      status: 'error',
+      message: 'Server error'
+    });
+  }
+};
+
+// 14. Check friendship status with a specific user
+exports.checkFriendshipStatus = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const currentUserId = req.user._id;
+
+    // Check if user exists
+    const targetUser = await User.findById(userId);
+    if (!targetUser) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'User not found'
+      });
+    }
+
+    // Check for existing friendship (accepted request)
+    const friendship = await FriendRequest.findOne({
+      $or: [
+        { fromUserId: currentUserId, toUserId: userId },
+        { fromUserId: userId, toUserId: currentUserId }
+      ],
+      status: 'accepted'
+    });
+
+    if (friendship) {
+      return res.json({
+        status: 'success',
+        data: {
+          isFriend: true,
+          hasPendingRequest: false,
+          requestDirection: null,
+          requestId: null
+        }
+      });
+    }
+
+    // Check for pending request
+    const pendingRequest = await FriendRequest.findOne({
+      $or: [
+        { fromUserId: currentUserId, toUserId: userId },
+        { fromUserId: userId, toUserId: currentUserId }
+      ],
+      status: 'pending'
+    });
+
+    if (pendingRequest) {
+      const requestDirection = pendingRequest.fromUserId.equals(currentUserId) ? 'sent' : 'received';
+      return res.json({
+        status: 'success',
+        data: {
+          isFriend: false,
+          hasPendingRequest: true,
+          requestDirection,
+          requestId: pendingRequest._id
+        }
+      });
+    }
+
+    // No relationship exists
+    res.json({
+      status: 'success',
+      data: {
+        isFriend: false,
+        hasPendingRequest: false,
+        requestDirection: null,
+        requestId: null
+      }
+    });
+  } catch (err) {
+    console.error('Check friendship status error:', err);
     res.status(500).json({
       status: 'error',
       message: 'Server error'

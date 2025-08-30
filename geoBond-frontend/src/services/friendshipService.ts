@@ -225,6 +225,22 @@ export const getFriendsWithStatus = async (): Promise<FriendWithStatus[]> => {
   }
 };
 
+// Check friendship status with a specific user
+export const checkFriendshipStatus = async (userId: string): Promise<{
+  isFriend: boolean;
+  hasPendingRequest: boolean;
+  requestDirection?: 'sent' | 'received';
+  requestId?: string;
+}> => {
+  try {
+    const response = await api.get(`/friendship/status/${userId}`);
+    return response.data.data;
+  } catch (error) {
+    console.error('Check friendship status error:', error);
+    throw error;
+  }
+};
+
 export const friendShipService = {
   searchUsers,
   sendFriendRequest,
@@ -239,4 +255,5 @@ export const friendShipService = {
   getUserStats,
   getRecentActivities,
   getFriendsWithStatus,
+  checkFriendshipStatus,
 };

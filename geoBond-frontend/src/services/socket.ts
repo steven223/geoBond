@@ -48,8 +48,63 @@ export const initSocket = () => {
   });
 };
 
-export const getSocket = () => socket;
+export const getSocket = () => {
+  if (!socket) {
+    console.warn('Socket not initialized');
+    return null;
+  }
+  return socket;
+};
 
 export const isSocketConnected = () => {
   return socket && socket.connected;
+};
+
+export const setupConnectedUsersListener = (callback: (count: number) => void) => {
+  if (socket) {
+    socket.on('users:count', (data: { count: number }) => {
+      callback(data.count);
+    });
+  }
+};
+
+export const removeConnectedUsersListener = () => {
+  if (socket) {
+    socket.off('users:count');
+  }
+};
+
+// Chat-specific socket functions
+export const setupChatListeners = (callbacks: {
+  onMessage?: (message: any) => void;
+  onTyping?: (data: { userId: string; isTyping: boolean; conversationId: string }) => void;
+  onRead?: (data: { userId: string; conversationId: string; readAt: string }) => void;
+  onError?: (error: { message: string }) => void;
+}) => {
+  if (!socket) return;
+
+  if (callbacks.onMessage) {
+    socket.on('chat:message', callbacks.onMessage);
+  }
+  
+  if (callbacks.onTyping) {
+    socket.on('chat:typing', callbacks.onTyping);
+  }
+  
+  if (callbacks.onRead) {
+    socket.on('chat:read', callbacks.onRead);
+  }
+  
+  if (callbacks.onError) {
+    socket.on('chat:error', callbacks.onError);
+  }
+};
+
+export const removeChatListeners = () => {
+  if (socket) {
+    socket.off('chat:message');
+    socket.off('chat:typing');
+    socket.off('chat:read');
+    socket.off('chat:error');
+  }
 };

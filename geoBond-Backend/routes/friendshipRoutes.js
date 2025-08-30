@@ -42,4 +42,7 @@ router.get('/activities/recent', authenticateJWT, friendshipController.getRecent
 // Get friends with online status
 router.get('/friends/status', authenticateJWT, friendshipController.getFriendsWithStatus);
 
+// Check friendship status with a specific user
+router.get('/status/:userId', authenticateJWT, friendshipController.checkFriendshipStatus);
+
 module.exports = router; 

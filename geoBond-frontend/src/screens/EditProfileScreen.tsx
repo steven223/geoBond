@@ -80,34 +80,54 @@ const EditProfileScreen: React.FC = () => {
       setIsLoading(true);
       
       // Use profile from route params if available, otherwise fetch current user profile
-      let profile: UserProfile;
+      let profile: UserProfile | null = null;
+      
       if (route.params?.userProfile) {
         profile = route.params.userProfile;
-      } else {
+      } else if (currentUser) {
         profile = await userService.getCurrentUserProfile();
+      }
+      
+      if (!profile) {
+        throw new Error('Unable to load profile data');
       }
       
       setUserProfile(profile);
       
-      // Populate form with existing data
+      // Populate form with existing data with safe defaults
       setFormData({
-        fullName: profile.fullName || '',
-        phone: profile.phone || '',
-        bio: profile.bio || '',
-        dob: profile.dob ? new Date(profile.dob).toISOString().split('T')[0] : '',
-        gender: profile.gender || '',
-        city: profile.location?.city || '',
-        state: profile.location?.state || '',
-        country: profile.location?.country || '',
+        fullName: profile?.fullName || '',
+        phone: profile?.phone || '',
+        bio: profile?.bio || '',
+        dob: profile?.dob ? (() => {
+          try {
+            const date = new Date(profile.dob);
+            if (isNaN(date.getTime())) {
+              return '';
+            }
+            return date.toISOString().split('T')[0];
+          } catch (error) {
+            console.error('Date parsing error:', error);
+            return '';
+          }
+        })() : '',
+        gender: profile?.gender || '',
+        city: profile?.location?.city || '',
+        state: profile?.location?.state || '',
+        country: profile?.location?.country || '',
       });
     } catch (error: any) {
       console.error('Load profile error:', error);
       Toast.show({
         type: 'error',
         text1: 'Load Failed',
-        text2: error.message || 'Failed to load profile',
+        text2: error?.message || 'Failed to load profile',
       });
-      navigation.goBack();
+      
+      // Safe navigation back
+      if (navigation?.goBack) {
+        navigation.goBack();
+      }
     } finally {
       setIsLoading(false);
     }
@@ -116,27 +136,35 @@ const EditProfileScreen: React.FC = () => {
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
 
-    if (!formData.fullName.trim()) {
+    // Validate full name
+    if (!formData?.fullName || !formData.fullName.trim()) {
       newErrors.fullName = 'Full name is required';
     } else if (formData.fullName.trim().length < 2) {
       newErrors.fullName = 'Full name must be at least 2 characters';
     }
 
-    if (formData.phone && !/^\+?[\d\s\-\(\)]{10,}$/.test(formData.phone)) {
+    // Validate phone
+    if (formData?.phone && !/^\+?[\d\s\-\(\)]{10,}$/.test(formData.phone)) {
       newErrors.phone = 'Please enter a valid phone number';
     }
 
-    if (formData.bio && formData.bio.length > 500) {
+    // Validate bio
+    if (formData?.bio && formData.bio.length > 500) {
       newErrors.bio = 'Bio must be less than 500 characters';
     }
 
-    if (formData.dob) {
-      const birthDate = new Date(formData.dob);
-      const today = new Date();
-      const age = today.getFullYear() - birthDate.getFullYear();
-      
-      if (isNaN(birthDate.getTime()) || age < 13 || age > 120) {
-        newErrors.dob = 'Please enter a valid date of birth (age must be between 13-120)';
+    // Validate date of birth
+    if (formData?.dob) {
+      try {
+        const birthDate = new Date(formData.dob);
+        const today = new Date();
+        const age = today.getFullYear() - birthDate.getFullYear();
+        
+        if (isNaN(birthDate.getTime()) || age < 13 || age > 120) {
+          newErrors.dob = 'Please enter a valid date of birth (age must be between 13-120)';
+        }
+      } catch (error) {
+        newErrors.dob = 'Please enter a valid date of birth';
       }
     }
 
@@ -219,12 +247,15 @@ const EditProfileScreen: React.FC = () => {
   };
 
   const getInitials = (name: string) => {
+    if (!name || typeof name !== 'string') {
+      return 'U';
+    }
     return name
       .split(' ')
-      .map(n => n[0])
+      .map(n => n?.[0] || '')
       .join('')
       .toUpperCase()
-      .slice(0, 2);
+      .slice(0, 2) || 'U';
   };
 
   if (isLoading) {
@@ -279,7 +310,7 @@ const EditProfileScreen: React.FC = () => {
                 <Image source={{ uri: userProfile.profileImageUrl }} style={styles.avatar} />
               ) : (
                 <View style={styles.avatarPlaceholder}>
-                  <Text style={styles.avatarText}>{getInitials(formData.fullName || userProfile.fullName)}</Text>
+                  <Text style={styles.avatarText}>{getInitials(formData.fullName || userProfile?.fullName || 'User')}</Text>
                 </View>
               )}
             </View>

@@ -59,14 +59,23 @@ class LocationService {
   }
 
   async stopLocationTracking() {
-    if (this.locationSubscription) {
-      this.locationSubscription.remove();
-      this.locationSubscription = null;
-    }
+    try {
+      if (this.locationSubscription) {
+        // Use the correct method to remove the subscription
+        await this.locationSubscription.remove();
+        this.locationSubscription = null;
+      }
 
-    this.isTracking = false;
-    this.currentUserId = null;
-    console.log('📍 Location tracking stopped');
+      this.isTracking = false;
+      this.currentUserId = null;
+      console.log('📍 Location tracking stopped');
+    } catch (error) {
+      console.error('📍 Error stopping location tracking:', error);
+      // Still clean up the state even if removal fails
+      this.locationSubscription = null;
+      this.isTracking = false;
+      this.currentUserId = null;
+    }
   }
 
   private async sendLocationViaSocket(location: Location.LocationObject) {
